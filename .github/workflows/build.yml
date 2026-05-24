@@ -1,4 +1,4 @@
-name: Diagnose Build
+name: Build ShieldPro APK
 
 on:
   push:
@@ -6,11 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  diagnose:
+  build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -19,44 +20,32 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Show repo contents
-        run: |
-          echo "=== ROOT FILES ==="
-          ls -la
-          echo "=== ZIP CONTENTS ==="
-          ZIP=$(find . -name "*.zip" | head -1)
-          echo "ZIP: $ZIP"
-          unzip -l "$ZIP"
-
       - name: Extract zip
         run: |
           ZIP=$(find . -name "*.zip" | head -1)
+          echo "Found: $ZIP"
           unzip -o "$ZIP" -d _ex/
           SRC=$(find _ex -name "settings.gradle.kts" | head -1 | xargs dirname)
-          echo "=== EXTRACTED ROOT ==="
-          ls -la "$SRC"
-          echo "=== app/build.gradle.kts ==="
-          cat "$SRC/app/build.gradle.kts"
-          echo "=== build.gradle.kts ==="
-          cat "$SRC/build.gradle.kts"
-          echo "=== gradle-wrapper.properties ==="
-          cat "$SRC/gradle/wrapper/gradle-wrapper.properties"
-          echo "=== gradlew exists? ==="
-          ls -la "$SRC/gradlew"
-
-      - name: Download wrapper jar
-        run: |
-          ZIP=$(find . -name "*.zip" | head -1)
-          unzip -o "$ZIP" -d _ex/
-          SRC=$(find _ex -name "settings.gradle.kts" | head -1 | xargs dirname)
+          echo "Source: $SRC"
           cp -r "$SRC"/. ./
+
+      - name: Download gradle-wrapper.jar
+        run: |
           mkdir -p gradle/wrapper
           curl -fsSL "https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
             -o gradle/wrapper/gradle-wrapper.jar
-          chmod +x gradlew
 
-      - name: Try build and show full error
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build APK
         run: |
-          export GRADLE_OPTS="-Xmx2g"
-          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | head -100
-        continue-on-error: true
+          export GRADLE_OPTS="-Xmx2g -Dfile.encoding=UTF-8"
+          ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShieldPro-APK
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30

@@ -22,39 +22,22 @@ jobs:
 
       - name: Extract zip
         run: |
-          # gradle.properties backup করো
           cp gradle.properties /tmp/gradle.properties.bak
-
           ZIP=$(find . -name "*.zip" | head -1)
           echo "Found ZIP: $ZIP"
           unzip -o "$ZIP" -d _ex/
           SRC=$(find _ex -name "settings.gradle.kts" | head -1 | xargs dirname)
-          echo "Source dir: $SRC"
           cp -r "$SRC"/. ./
-
-          # repo এর gradle.properties restore করো
           cp /tmp/gradle.properties.bak gradle.properties
-          echo "gradle.properties restored ✓"
-          cat gradle.properties
+          echo "Done ✓"
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Download gradle-wrapper.jar
-        run: |
-          mkdir -p gradle/wrapper
-          curl -fsSL \
-            "https://services.gradle.org/distributions/gradle-8.4-bin.zip" \
-            -o /tmp/gradle-dist.zip
-          unzip -p /tmp/gradle-dist.zip \
-            $(unzip -Z1 /tmp/gradle-dist.zip | grep "gradle-wrapper" | head -1) \
-            > gradle/wrapper/gradle-wrapper.jar
-          echo "JAR size: $(wc -c < gradle/wrapper/gradle-wrapper.jar) bytes ✓"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 'current'
 
       - name: Build Debug APK
-        run: |
-          export GRADLE_OPTS="-Xmx2g -Dfile.encoding=UTF-8"
-          ./gradlew assembleDebug --stacktrace --no-daemon
+        run: gradle assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

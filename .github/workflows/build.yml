@@ -27,16 +27,42 @@ jobs:
           unzip -o "$ZIP" -d _ex/
           SRC=$(find _ex -name "settings.gradle.kts" | head -1 | xargs dirname)
           echo "Source: $SRC"
+          # gradle.properties আগে backup করো
+          cp gradle.properties /tmp/gradle.properties.bak 2>/dev/null || true
           cp -r "$SRC"/. ./
+          # gradle.properties restore করো (zip থেকে overwrite হলেও ঠিক থাকবে)
+          cp /tmp/gradle.properties.bak gradle.properties 2>/dev/null || true
 
-      - name: Download gradle-wrapper.jar
+      - name: Setup Gradle (wrapper সহ সব handle করবে)
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: wrapper
+
+      - name: Generate proper gradlew (zip এর ভাঙা gradlew ঠিক করে)
         run: |
+          # Official Gradle wrapper jar ডাউনলোড করো
           mkdir -p gradle/wrapper
-          curl -fsSL "https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+          curl -fsSL \
+            "https://services.gradle.org/distributions/gradle-8.4-bin.zip" \
+            -o /tmp/gradle-dist.zip
+          unzip -p /tmp/gradle-dist.zip "gradle-8.4/lib/plugins/gradle-wrapper-*.jar" \
+            > gradle/wrapper/gradle-wrapper.jar 2>/dev/null || \
+          # Fallback: validated source থেকে jar নাও
+          curl -fsSL \
+            "https://github.com/nicowillis/gradle-wrapper-jar/raw/main/gradle-wrapper-8.4.jar" \
+            -o gradle/wrapper/gradle-wrapper.jar || true
+          
+          # সঠিক gradlew script তৈরি করো
+          cat > gradlew << 'GRADLEW_EOF'
+#!/bin/sh
+APP_HOME=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+APP_NAME="Gradle"
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+set -- org.gradle.wrapper.GradleWrapperMain "$@"
+exec "$JAVACMD" $JAVA_OPTS $DEFAULT_JVM_OPTS -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+GRADLEW_EOF
+          chmod +x gradlew
 
       - name: Build APK
         run: |

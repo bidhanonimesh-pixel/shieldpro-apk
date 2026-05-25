@@ -1,0 +1,57 @@
+name: Build ShieldPro APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: |
+          unzip shieldpro_v5.zip
+          ls
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Create keystore & env files
+        working-directory: shieldpro_v5
+        run: |
+          touch .env
+          cp .env.example .env 2>/dev/null || true
+          keytool -genkey -v \
+            -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Make gradlew executable
+        working-directory: shieldpro_v5
+        run: chmod +x gradlew
+
+      - name: Build APK
+        working-directory: shieldpro_v5
+        run: ./gradlew assembleDebug --stacktrace
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShieldPro-APK
+          path: shieldpro_v5/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

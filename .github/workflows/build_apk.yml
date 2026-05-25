@@ -1,4 +1,4 @@
-name: Diagnose ShieldPro
+name: Build ShieldPro APK
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  diagnose:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,37 +19,41 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Unzip and show structure
+      - name: Unzip project
         run: |
           unzip shieldpro_v5.zip
-          echo "====== ROOT FILES ======"
-          ls -la shieldpro_v5/
-          echo ""
-          echo "====== gradlew exists? ======"
-          ls -la shieldpro_v5/gradlew 2>/dev/null && echo "YES" || echo "NO - gradlew missing!"
-          echo ""
-          echo "====== build.gradle.kts ======"
-          cat shieldpro_v5/app/build.gradle.kts
-          echo ""
-          echo "====== settings.gradle.kts ======"
-          cat shieldpro_v5/settings.gradle.kts
-          echo ""
-          echo "====== libs.versions.toml ======"
-          cat shieldpro_v5/gradle/libs.versions.toml
-          echo ""
-          echo "====== AndroidManifest ======"
-          cat shieldpro_v5/app/src/main/AndroidManifest.xml
+          ls shieldpro_v5/
 
-      - name: Setup Gradle
+      - name: Setup Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: '9.3.1'
 
-      - name: Try build and show errors
+      - name: Create env and keystore
         working-directory: shieldpro_v5
-        continue-on-error: true
         run: |
-          gradle assembleDebug --no-daemon 2>&1
+          echo "STORE_PASSWORD=android" > .env
+          echo "KEY_PASSWORD=android" >> .env
+          cp .env .env.example
+          keytool -genkey -v \
+            -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Build APK
+        working-directory: shieldpro_v5
+        run: gradle assembleDebug --no-daemon --stacktrace
         env:
           STORE_PASSWORD: android
           KEY_PASSWORD: android
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShieldPro-APK
+          path: shieldpro_v5/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

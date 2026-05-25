@@ -51,7 +51,7 @@ jobs:
       - name: Build Debug APK
         run: |
           cd "$PROJECT_DIR"
-          gradle assembleDebug --no-daemon --stacktrace
+          gradle assembleDebug --no-daemon --no-configuration-cache --stacktrace
         env:
           STORE_PASSWORD: android
           KEY_PASSWORD: android

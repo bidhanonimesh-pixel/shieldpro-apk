@@ -19,19 +19,23 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Unzip project
+      - name: Find and extract zip
         run: |
-          unzip shieldpro_v5.zip
-          ls shieldpro_v5/
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -1)
+          echo "Found zip: $ZIP_FILE"
+          unzip "$ZIP_FILE"
+          PROJECT_DIR=$(unzip -Z1 "$ZIP_FILE" | head -1 | cut -d/ -f1)
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Project folder: $PROJECT_DIR"
 
       - name: Setup Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      - name: Create env and keystore
-        working-directory: shieldpro_v5
+      - name: Create keystore and env files
         run: |
+          cd "$PROJECT_DIR"
           echo "STORE_PASSWORD=android" > .env
           echo "KEY_PASSWORD=android" >> .env
           cp .env .env.example
@@ -44,9 +48,10 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Build APK
-        working-directory: shieldpro_v5
-        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Build Debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug --no-daemon --stacktrace
         env:
           STORE_PASSWORD: android
           KEY_PASSWORD: android
@@ -55,5 +60,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ShieldPro-APK
-          path: shieldpro_v5/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
